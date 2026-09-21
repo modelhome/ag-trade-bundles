@@ -12,7 +12,7 @@ installed as pinned pip packages inside each bundle's image.
 
 | Bundle | Model | Inputs -> Outputs |
 |---|---|---|
-| `corn-trade-policy/` | **Not yet built.** US corn trade-policy impact: the price move implied by a stated export-demand scenario, beside the weather-driven move the upstream model reports | a `corn-price` impact document plus a stated lost-sales scenario -> the combined implied impact, weather and trade components reported separately |
+| `corn-trade-policy/` | **US Corn Trade Policy Impact.** The price move implied by a stated export-demand scenario, reported beside the weather-driven move the upstream model reports | a `corn-price` impact document plus a stated lost-sales scenario, in million bushels not sold -> the implied impact with the weather and trade components separate, each with its own range, and a combined figure |
 
 This is the trade end of a climate -> agriculture -> finance flow:
 

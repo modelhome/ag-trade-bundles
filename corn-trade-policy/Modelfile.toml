@@ -1,0 +1,409 @@
+name = "US Corn Trade Policy Impact"
+description = "What a stated export-demand scenario would do to the corn price, beside what the weather is already doing. Takes the US Corn Price Impact model's result and a scenario you state -- how many million bushels of US corn go unsold -- and works out the price move that implies, reporting the weather effect and the trade effect separately, each with the range around it. It does not know what a tariff is and does not try to: trade reallocates, so how many bushels a policy actually costs is your assumption, not this model's. Not a forecast of prices, and not a forecast of politics."
+# Prints the corn_trade_policy_impact document JSON to stdout; the platform
+# redirects it to the output file. This model writes no second output.
+run = "docker run --rm -v \"$PWD/run:/run\" ${IMAGE} ${ARGS} > run/corn_trade_policy_impact.output.json"
+image = "modelhome/ag-trade-corn-trade-policy:latest"
+args = ["{input:corn_price_impact}", "{input:scenario}"]
+
+# Semantic annotations. Determinism: like the upstream price and yield models,
+# this one makes no network calls at run time. It fits nothing: the transmission
+# coefficient, its bootstrap interval, the reference price and the export
+# exposure are all read from the upstream document, so an upstream refit
+# propagates here without a change. The only committed table is the destination
+# context, which enters no arithmetic.
+determinism = "deterministic"
+expected_runtime = "seconds"
+validity_domain = "US corn, national, one marketing year. Prices a stated loss of export demand, in million bushels, against the upstream weather baseline. The scenario is turned into a shock by dividing by total use for the current marketing year, which is about 1% from the basis the coefficient was fitted on and has been up to 7% away historically. The transmission is reused from the upstream model, where it was fitted on supply-side weather shocks over 50 years and explains about a third of year-on-year price variation. See the README."
+not_for = "This is NOT a price forecast, NOT a trading signal and NOT investment advice, and it is NOT a political forecast: it does not predict whether any tariff or trade measure will be imposed, extended or lifted. The scenario is an input you state, not a finding. It must not be used to convert a tariff rate into lost sales -- trade reallocates, and the bushels are your assumption. The coefficient was fitted on supply shocks and is reused here for a demand shock, which assumes a symmetry the fit does not demonstrate. Not a substitute for USDA WASDE."
+provenance = "Upstream: the US Corn Price Impact model, which supplies the transmission fitted on 1976-2025, its bootstrap interval, the reference price and the export exposure. Destination context: USDA ERS Feed Grains Database, Feed Grains Yearbook Tables, Table 22, marketing years 1992-2024, the same file and vintage the upstream model uses. Nothing is fitted here."
+
+[resources]
+# Reading one committed table of a few thousand rows and evaluating two
+# exponentials. The fit it applies was precomputed upstream.
+memory = "256Mi"
+cpu = "0.5"
+
+[[inputs]]
+# The whole input is the upstream model's corn_price_impact output. Flow steps
+# bind by required-key set, and ["generated_at", "metadata", "national",
+# "regions", "assumptions"] matches corn_price_impact rather than
+# corn_price_regions, whose required keys are metadata / columns / rows -- a set
+# that also matches the yield model's snapshot two steps up and would therefore
+# bind the wrong document.
+#
+# There is deliberately no `default` here, for the same reason the upstream
+# model gives: a schema default is a runnable "Example to paste", and a runnable
+# example for this model is a whole price-impact document, too large to paste.
+# This model is meant to run after the price model in a flow.
+name = "corn_price_impact"
+description = "The result document from the US Corn Price Impact model. In a flow this is wired straight from that model's output; nothing else needs filling in."
+
+[inputs.schema]
+type = "object"
+required = ["generated_at", "metadata", "national", "regions", "assumptions"]
+description = "A US Corn Price Impact document. The transmission, the weather result, the reference price and the export exposure are all read from it, so this model sources none of them itself."
+
+[inputs.schema.properties.generated_at]
+type = "string"
+format = "date-time"
+description = "When the upstream run was written."
+
+[inputs.schema.properties.metadata]
+# Declared as a plain object on purpose. The upstream output declares no
+# sub-properties inside its own metadata, so requiring any here would make the
+# subset rule fail at wiring time. The fields this model reads out of it --
+# metadata.transmission and metadata.export_exposure -- are checked by the
+# runner instead, which names the missing path and stops rather than defaulting.
+type = "object"
+description = "The upstream run's metadata. The fitted transmission and its interval, and the export exposure the scenario is measured against, are read from it."
+
+[inputs.schema.properties.national]
+type = "object"
+# Every key required here is in the upstream output's own required list, which
+# is what the platform's subset rule needs for the two to bind. Declaring them
+# makes a flow refuse to wire a document that could not be priced.
+required = [
+  "date",
+  "us_yield_shock_pct",
+  "price_impact_pct", "price_impact_pct_low", "price_impact_pct_high",
+  "reference_price_usd_bu",
+  "price_impact_usd_bu", "price_impact_usd_bu_low", "price_impact_usd_bu_high",
+]
+description = "The upstream national result. Its weather figures are carried through unchanged and its yield shock is combined with the scenario's."
+
+[inputs.schema.properties.national.properties.date]
+type = "string"
+format = "date"
+description = "The day the upstream result describes."
+
+[inputs.schema.properties.national.properties.us_yield_shock_pct]
+type = "number"
+unit = "%"
+description = "The national weather-driven yield shock. Combined with the scenario's shock inside the transmission to give the combined figure."
+
+[inputs.schema.properties.national.properties.price_impact_pct]
+type = "number"
+unit = "%"
+description = "The weather-driven price impact. Carried through unchanged; this model never recomputes it."
+
+[inputs.schema.properties.national.properties.price_impact_pct_low]
+type = "number"
+unit = "%"
+description = "The low end of the weather impact, carried through."
+
+[inputs.schema.properties.national.properties.price_impact_pct_high]
+type = "number"
+unit = "%"
+description = "The high end of the weather impact, carried through."
+
+[inputs.schema.properties.national.properties.reference_price_usd_bu]
+type = "number"
+unit = "$/bu"
+description = "The corn price the dollar figures are worked out against, taken from upstream so both models quote the same one."
+
+[inputs.schema.properties.national.properties.price_impact_usd_bu]
+type = "number"
+unit = "$/bu"
+description = "The weather impact in dollars a bushel, carried through."
+
+[inputs.schema.properties.national.properties.price_impact_usd_bu_low]
+type = "number"
+unit = "$/bu"
+description = "The low end in dollars a bushel, carried through."
+
+[inputs.schema.properties.national.properties.price_impact_usd_bu_high]
+type = "number"
+unit = "$/bu"
+description = "The high end in dollars a bushel, carried through."
+
+[inputs.schema.properties.regions]
+type = "array"
+description = "The upstream per-region contributions. This model is national only and does not read them; they are part of the document it binds to."
+
+[inputs.schema.properties.assumptions]
+type = "object"
+description = "The upstream assumptions. Its not_captured list is carried into this model's own, so a reader sees both models' limits in one place."
+
+[[inputs]]
+# The scenario. In a flow this is an `inline` literal the flow author supplies:
+# the platform resolves each input independently, so a second input does not
+# have to come from the step before. required = [] and defaults in the runner,
+# so an absent, empty or zero scenario gives a trade component of exactly zero
+# and the model still runs -- standalone, or in a flow with nothing to say yet.
+name = "scenario"
+description = "How much export demand to remove. State it in million bushels of US corn that go unsold; leave it at zero to report the weather effect alone."
+
+[inputs.schema]
+type = "object"
+required = []
+description = "The export-demand scenario. This is your assumption about how many bushels are lost, not something the model works out from a policy."
+default = { bushels_not_sold_mil_bu = 300, scenario_label = "illustrative: 300 mil bu of export demand removed" }
+
+[inputs.schema.properties.bushels_not_sold_mil_bu]
+type = "number"
+unit = "mil bu"
+description = "Million bushels of US corn export demand removed. Positive means sales are lost, which pushes the price down; negative means extra sales. Deliberately NOT a tariff rate: trade reallocates, so turning a policy into a number of bushels is your judgement. For scale, all US corn exports in the latest complete marketing year were about 3,400 mil bu, and the largest buyer, Mexico, took about 1,000."
+
+[inputs.schema.properties.scenario_label]
+type = "string"
+description = "Optional. A short note saying what the scenario represents, carried into the output so a reader knows where the number came from."
+
+[[outputs]]
+# One document, national only. Export demand is a national quantity and there is
+# no defensible way to attribute a lost cargo to one state rather than another,
+# so this model does no region join at all. The required-key set includes
+# `scenario`, which keeps it distinguishable from the upstream document for any
+# further step downstream.
+name = "corn_trade_policy_impact"
+description = "The corn price impact a stated export-demand scenario implies, reported beside the weather-driven impact: the scenario as a share of the market, both components with their ranges, the combined figure, and every assumption behind them."
+
+[outputs.schema]
+type = "object"
+required = ["generated_at", "metadata", "scenario", "national", "assumptions"]
+description = "The price impact implied by a stated trade scenario. Not a forecast, and not a prediction of policy."
+
+[outputs.schema.properties.generated_at]
+type = "string"
+format = "date-time"
+description = "When the output was written (UTC)."
+
+[outputs.schema.properties.metadata]
+type = "object"
+description = "How the run was made: the upstream transmission and the symmetry assumption under which it was reused, the export exposure, the destination table's source and vintage, and the upstream run this came from."
+
+[outputs.schema.properties.scenario]
+type = "object"
+required = ["bushels_not_sold_mil_bu", "equivalent_supply_shock_pct", "share_of_total_use", "measured_against", "stated_by"]
+description = "What was assumed, and how big it is against the market it was measured in."
+
+[outputs.schema.properties.scenario.properties.bushels_not_sold_mil_bu]
+type = "number"
+unit = "mil bu"
+description = "The scenario as stated."
+
+[outputs.schema.properties.scenario.properties.label]
+type = "string"
+description = "The note supplied with the scenario, if any."
+
+[outputs.schema.properties.scenario.properties.equivalent_supply_shock_pct]
+type = "number"
+unit = "%"
+description = "The scenario as a proportional shock: demand removed is equivalent, for price, to a surplus of the same size, which is the quantity the transmission was fitted on."
+
+[outputs.schema.properties.scenario.properties.share_of_total_use]
+type = "number"
+description = "The scenario as a share of total US corn use for the current marketing year, from 0 to 1."
+
+[outputs.schema.properties.scenario.properties.share_of_latest_complete_exports]
+type = "number"
+description = "The scenario as a share of all US corn exports in the latest complete marketing year, from 0 to 1. Above 1 the run fails: there is not that much export demand to lose."
+
+[outputs.schema.properties.scenario.properties.measured_against]
+type = "object"
+description = "The market the scenario was measured against: total use, the marketing year it belongs to, whether that year is a USDA projection, and how it was derived."
+
+[outputs.schema.properties.scenario.properties.stated_by]
+type = "string"
+description = "Who supplied the scenario. Always the person running the model; it is an input, never a finding."
+
+[outputs.schema.properties.national]
+type = "object"
+required = ["date", "reference_price_usd_bu", "weather", "trade", "combined"]
+description = "The national result, with the weather and trade effects kept apart."
+
+[outputs.schema.properties.national.properties.date]
+type = "string"
+format = "date"
+description = "The day this result describes, from the upstream document."
+
+[outputs.schema.properties.national.properties.reference_price_usd_bu]
+type = "number"
+unit = "$/bu"
+description = "The corn price the dollar figures are worked out against, taken from upstream."
+
+[outputs.schema.properties.national.properties.weather]
+type = "object"
+# Each headline figure is required together with its _low and _high, so a number
+# cannot ship without its range even by accident.
+required = [
+  "price_impact_pct", "price_impact_pct_low", "price_impact_pct_high",
+  "price_impact_usd_bu", "price_impact_usd_bu_low", "price_impact_usd_bu_high",
+]
+description = "The weather-driven impact, carried through from the upstream model unchanged. This model does not recompute it."
+
+[outputs.schema.properties.national.properties.weather.properties.us_yield_shock_pct]
+type = "number"
+unit = "%"
+description = "The upstream national yield shock."
+
+[outputs.schema.properties.national.properties.weather.properties.price_impact_pct]
+type = "number"
+unit = "%"
+description = "The weather-driven price impact."
+
+[outputs.schema.properties.national.properties.weather.properties.price_impact_pct_low]
+type = "number"
+unit = "%"
+description = "Its low end."
+
+[outputs.schema.properties.national.properties.weather.properties.price_impact_pct_high]
+type = "number"
+unit = "%"
+description = "Its high end."
+
+[outputs.schema.properties.national.properties.weather.properties.price_impact_usd_bu]
+type = "number"
+unit = "$/bu"
+description = "The same in dollars a bushel."
+
+[outputs.schema.properties.national.properties.weather.properties.price_impact_usd_bu_low]
+type = "number"
+unit = "$/bu"
+description = "Its low end in dollars a bushel."
+
+[outputs.schema.properties.national.properties.weather.properties.price_impact_usd_bu_high]
+type = "number"
+unit = "$/bu"
+description = "Its high end in dollars a bushel."
+
+[outputs.schema.properties.national.properties.weather.properties.source]
+type = "string"
+description = "Says plainly that these figures were carried through rather than recomputed."
+
+[outputs.schema.properties.national.properties.trade]
+type = "object"
+required = [
+  "equivalent_supply_shock_pct",
+  "price_impact_pct", "price_impact_pct_low", "price_impact_pct_high",
+  "price_impact_usd_bu", "price_impact_usd_bu_low", "price_impact_usd_bu_high",
+]
+description = "The impact the stated scenario implies on its own, holding the weather effect aside."
+
+[outputs.schema.properties.national.properties.trade.properties.equivalent_supply_shock_pct]
+type = "number"
+unit = "%"
+description = "The scenario expressed as the proportional shock the transmission was fitted on."
+
+[outputs.schema.properties.national.properties.trade.properties.price_impact_pct]
+type = "number"
+unit = "%"
+description = "How much the corn price moves because of the scenario alone. A scenario that removes demand moves it down."
+
+[outputs.schema.properties.national.properties.trade.properties.price_impact_pct_low]
+type = "number"
+unit = "%"
+description = "The low end, from the upstream bootstrap interval on the transmission."
+
+[outputs.schema.properties.national.properties.trade.properties.price_impact_pct_high]
+type = "number"
+unit = "%"
+description = "The high end of that same range."
+
+[outputs.schema.properties.national.properties.trade.properties.price_impact_usd_bu]
+type = "number"
+unit = "$/bu"
+description = "The same in dollars a bushel."
+
+[outputs.schema.properties.national.properties.trade.properties.price_impact_usd_bu_low]
+type = "number"
+unit = "$/bu"
+description = "Its low end in dollars a bushel."
+
+[outputs.schema.properties.national.properties.trade.properties.price_impact_usd_bu_high]
+type = "number"
+unit = "$/bu"
+description = "Its high end in dollars a bushel."
+
+[outputs.schema.properties.national.properties.combined]
+type = "object"
+required = [
+  "total_shock_pct",
+  "price_impact_pct", "price_impact_pct_low", "price_impact_pct_high",
+  "price_impact_usd_bu", "price_impact_usd_bu_low", "price_impact_usd_bu_high",
+]
+description = "Both effects together. NOT the sum of the two figures above: the transmission is log-linear, so the shocks combine inside it."
+
+[outputs.schema.properties.national.properties.combined.properties.total_shock_pct]
+type = "number"
+unit = "%"
+description = "The weather shock and the scenario's equivalent shock added together, before the transmission is applied."
+
+[outputs.schema.properties.national.properties.combined.properties.price_impact_pct]
+type = "number"
+unit = "%"
+description = "The combined price impact."
+
+[outputs.schema.properties.national.properties.combined.properties.price_impact_pct_low]
+type = "number"
+unit = "%"
+description = "Its low end. Both components use the same coefficient, so this comes from applying the interval to the combined shock, never from adding two intervals."
+
+[outputs.schema.properties.national.properties.combined.properties.price_impact_pct_high]
+type = "number"
+unit = "%"
+description = "The high end of that same range."
+
+[outputs.schema.properties.national.properties.combined.properties.price_impact_usd_bu]
+type = "number"
+unit = "$/bu"
+description = "The combined impact in dollars a bushel."
+
+[outputs.schema.properties.national.properties.combined.properties.price_impact_usd_bu_low]
+type = "number"
+unit = "$/bu"
+description = "Its low end in dollars a bushel."
+
+[outputs.schema.properties.national.properties.combined.properties.price_impact_usd_bu_high]
+type = "number"
+unit = "$/bu"
+description = "Its high end in dollars a bushel."
+
+[outputs.schema.properties.national.properties.combined.properties.composition]
+type = "string"
+description = "Says in words that this figure is not the sum of the two components."
+
+[outputs.schema.properties.assumptions]
+type = "object"
+required = ["not_a_forecast", "scenario_is_an_input", "symmetry", "denominator", "composition", "interval_definition", "reallocation"]
+description = "Every assumption behind the numbers, as data rather than prose buried in a README."
+
+[outputs.schema.properties.assumptions.properties.not_a_forecast]
+type = "string"
+description = "What this output is and, more importantly, what it is not -- including that it is not a forecast of policy."
+
+[outputs.schema.properties.assumptions.properties.scenario_is_an_input]
+type = "string"
+description = "Why the model takes bushels rather than a tariff rate, with the measured episodes behind that choice."
+
+[outputs.schema.properties.assumptions.properties.symmetry]
+type = "string"
+description = "That the transmission was fitted on supply shocks and is being applied to a demand shock, and what that assumes."
+
+[outputs.schema.properties.assumptions.properties.denominator]
+type = "string"
+description = "What the scenario's bushels were divided by, why that basis, and how far it sits from the one the coefficient was fitted on."
+
+[outputs.schema.properties.assumptions.properties.composition]
+type = "string"
+description = "Why the combined figure is not the sum of the two components."
+
+[outputs.schema.properties.assumptions.properties.interval_definition]
+type = "string"
+description = "What the low and high figures mean, and what they do not mean."
+
+[outputs.schema.properties.assumptions.properties.reallocation]
+type = "string"
+description = "That trade reallocates rather than disappearing, with the measured episodes, and why no historical episode validates this model."
+
+[outputs.schema.properties.assumptions.properties.destinations_context]
+type = "string"
+description = "That the destination table is context and never converts a policy into bushels."
+
+[outputs.schema.properties.assumptions.properties.not_captured]
+type = "array"
+description = "The effects this model leaves out, named one by one, including the upstream model's own list."
+
+[outputs.schema.properties.assumptions.properties.not_captured.items]
+type = "string"
+description = "One effect the model does not capture."
