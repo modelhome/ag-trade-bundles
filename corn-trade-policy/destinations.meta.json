@@ -1,0 +1,69 @@
+{
+  "vintage": "USDA ERS Feed Grains Database, Feed Grains Yearbook Tables -- All Years",
+  "source": "https://www.ers.usda.gov/media/5766/feed-grains-yearbook-tables-all-years.csv",
+  "source_last_modified": null,
+  "tables": [
+    "Table 22--U.S. corn and sorghum exports by selected destinations",
+    "Table 4--Corn: Supply and disappearance (validation only, not committed)"
+  ],
+  "unit": "million bushels",
+  "source_unit": "1,000 metric tons",
+  "conversion": "1,000 metric tons x 0.03936822 = million bushels (1 bu corn = 56 lb = 25.4012 kg, so 1 t = 39.36822 bu)",
+  "marketing_year": "Sep-Aug",
+  "period": "1992-2024",
+  "latest_marketing_year": 2024,
+  "built_at": "2026-09-21T05:10:04+00:00",
+  "destinations": 106,
+  "annual_total_exports_mil_bu": {
+    "1992": 1663.277,
+    "1993": 1328.321,
+    "1994": 2177.48,
+    "1995": 2227.822,
+    "1996": 1797.367,
+    "1997": 1504.425,
+    "1998": 1984.192,
+    "1999": 1936.564,
+    "2000": 1941.346,
+    "2001": 1904.766,
+    "2002": 1587.886,
+    "2003": 1899.816,
+    "2004": 1818.054,
+    "2005": 2133.81,
+    "2006": 2125.368,
+    "2007": 2437.4,
+    "2008": 1848.946,
+    "2009": 1979.025,
+    "2010": 1830.923,
+    "2011": 1539.155,
+    "2012": 730.088,
+    "2013": 1920.782,
+    "2014": 1866.88,
+    "2015": 1898.632,
+    "2016": 2295.686,
+    "2017": 2437.112,
+    "2018": 2068.34,
+    "2019": 1778.475,
+    "2020": 2746.935,
+    "2021": 2472.394,
+    "2022": 1661.91,
+    "2023": 2254.818,
+    "2024": 2872.533
+  },
+  "tie_out": {
+    "method": "Table 22's World total compared against Table 4's US corn Exports for the same marketing year, in the same file and the same vintage",
+    "tolerance_relative": 0.0001,
+    "years_committed": 33,
+    "max_relative_error_committed": 2.1126557775105746e-06,
+    "excluded_years": {
+      "1989": 0.989409,
+      "1990": 0.991073,
+      "1991": 0.343067
+    }
+  },
+  "definitions": {
+    "role": "context only. This table tells a reader who buys US corn and how much; it enters no arithmetic in this model and is never used to convert a scenario into bushels",
+    "share_of_total_exports": "a destination's exports over that marketing year's world total, both from Table 22",
+    "lag": "Table 22 ends one marketing year before the balance sheet, which carries a WASDE projection. The two must never be presented as the same year"
+  },
+  "note": "Built once by build_destinations.py and never edited by hand. The window is derived from the tie-out above rather than declared, so a future ERS backfill widens it on the next build instead of being locked out by a hard-coded start year."
+}

@@ -241,10 +241,28 @@ restating them.
 
 ## The `corn-trade-policy/` bundle
 
-**Not yet built.** No brief, no plan, no code. What follows is the design
-context carried over from the node 3 discussion that produced this repo. It is
-**recorded reasoning, not settled design**: the brief is where it becomes a
-decision, and every open question below is genuinely open.
+**US Corn Trade Policy Impact.** Takes node 3's `corn_price_impact` document and
+a stated export-demand scenario -- million bushels of US corn not sold -- and
+returns the price impact that scenario implies, reported beside node 3's
+weather-driven impact, each component with its own interval and a combined
+figure composed inside the transmission rather than by adding percentages. Built
+2026-09-20 from brief `docs/features/0001-corn-trade-policy.md`; plan with every
+decision and its reasoning: `docs/plans/0001-corn-trade-policy.md`. User-facing
+documentation: [`corn-trade-policy/README.md`](./corn-trade-policy/README.md).
+
+```
+corn-trade-policy/
+  Modelfile.toml            two inputs (node 3's document, a scenario), one JSON output
+  Dockerfile                python:3.12-slim, no pip layer at all
+  runner.py                 the model
+  destinations.csv          US corn exports by destination, 1992-2024 (2,312 rows)
+  destinations.meta.json    provenance, the tie-out and the excluded years
+  build_destinations.py     one-time destination-table build (not in the image)
+  check_trade_policy.py     validation, needs Python 3.11+ (not in the image)
+  sample_input.json         a real node 3 corn_price_impact
+  sample_scenario.json      the illustrative 300 mil bu scenario
+  README.md
+```
 
 ### Why node 4 is a separate model rather than a term inside node 3
 
@@ -263,54 +281,124 @@ Three reasons, in descending order of force:
    marketing-year average cash price. Weather accumulates over a season; a
    tariff is a discrete jump that futures price within hours.
 
-### Shape, as far as it is understood
+### Design notes
 
-Input 1: node 3's `corn_price_impact`, bound on its required-key set. Input 2: a
-**scenario**, supplied per run as an `inline` literal -- bushels of export demand
-removed. Output: the combined implied impact with the weather and trade
-components reported **separately**, each with its own interval.
+- **The model fits nothing, and hard-codes no coefficient.** The transmission,
+  its bootstrap interval, the fit statistics, the reference price and the export
+  exposure are all read from node 3's output document. An upstream refit
+  therefore propagates with no change here, and the check asserts it: a doubled
+  coefficient in the input must move the result, and `runner.py` must not
+  contain the coefficient's digits.
+- **The denominator is the model's biggest arithmetic risk, and the obvious
+  field is the wrong one.** Node 3's coefficient is fitted on the national
+  yield's deviation from an ERS trend, whose commensurate bushel base is area
+  harvested times trend yield: 16,344 mil bu for marketing year 2026. Node 3
+  emits neither that figure nor the area to compute it. The model divides by
+  **total use**, 16,180 mil bu, recovered from `metadata.export_exposure` as
+  exports over export share. Node 3's `us_trend_production_bu` (14,894 mil bu) is
+  **deliberately not used**: it is built on 2022 Census acreage and sits 8.9%
+  below the fitted basis, which would inflate a 300 mil bu scenario from -1.44%
+  to -1.56%. The remaining gap is about 1% for 2026 and has run -3.4% to +6.7%
+  since 2015; closing it is an upstream follow-up, not a change here.
+- **The two effects compose, they do not add.** The transmission is log-linear,
+  so the combined impact is `exp(b0 * (d_weather + d_trade)) - 1`, not the sum of
+  the two percentages. Both components share one coefficient, so their intervals
+  are perfectly correlated and the combined interval comes from applying the
+  bounds to the combined shock.
+- **The destination table's window is derived, not declared.** A marketing year
+  is committed only when ERS Table 22's world total ties out to Table 4's exports
+  within 1e-4. 1989, 1990 and 1991 fail by 98.9%, 99.1% and 34.3% and are
+  excluded with their errors recorded; 1992-2024 tie out to 2.1e-06. A
+  hard-coded start year would have encoded today's answer and gone quietly wrong
+  on an ERS backfill.
+- **No new data source was needed.** ERS Table 22 lives in the same keyless file
+  node 3 already downloads, so FAS GATS, FAS Export Sales Reporting and Census
+  USA Trade Online were all ruled out before anything was fetched.
 
-Illustrative magnitude, using node 3's committed coefficient and the 2026
-projection row, purely to show the channel is worth modelling: 300 mil bu
-removed against 16,180 mil bu of total use is a 1.85% demand shock; times
--0.7826 is about -1.45%, or roughly -$0.07/bu on $4.80, interval -0.73% to
--2.35%. That is several times the weather signal in node 3's committed sample
-run (-0.18%). **An illustration of magnitude, not a result**, and it inherits
-every caveat below.
+### The four problems, as answered
 
-### The four problems the brief has to answer
+1. **Corn is not soybeans -- and the shares are now measured, not recalled.**
+   China's share of US corn exports by marketing year, from ERS Table 22: 0.5%
+   (2018), 4.6% (2019), 30.8% (2020), 23.3% (2021), 18.3% (2022), 5.2% (2023),
+   **0.04% (2024)**. Mexico runs 22-40% throughout and is 35.1% in 2024; Japan
+   16-25%. China is episodic; Mexico and Japan are the steady buyers. **Decision:
+   corn only**, with the destination table shipped as context so a scenario can
+   be stated against measured purchases. The soybean and acreage channel --
+   probably the larger one for a China tariff, since China takes roughly half of
+   US soybean exports -- is documented in the bundle README and in the output's
+   `not_captured`, and is a separate brief.
+2. **The coefficient was fitted on supply shocks. Decision: reuse it**, with the
+   symmetry assumption stated in the output document, the README and `not_for`.
+   A separate demand-side fit was rejected: exports are endogenous to the price
+   within the marketing year, so it would need an instrument, and three episodes
+   in fifty years would fail the |t| >= 2.0 rule anyway.
+3. **A tariff is not a one-for-one sales loss. Decision: bushels, national.**
+   Measured, and the reason this is not negotiable: US corn sales to China fell
+   from 118 mil bu in marketing year 2023 to 1 mil bu in 2024 while **total US
+   corn exports rose** from 2,255 to 2,873 mil bu; and across the 1980 Soviet
+   embargo exports were 2,401 mil bu in 1979 against 2,391 in 1980. Both
+   episodes reallocated instead of disappearing.
+4. **Announcement and expectation.** Stated in `not_for`, the README and the
+   output document, all three, together with the fact that this is not a
+   political forecast.
 
-1. **Corn is not soybeans.** China's corn purchases are episodic -- near zero in
-   most years, a large spike in 2020-22, then down again -- while Mexico and
-   Japan are the steady buyers. The dominant China-tariff channel for corn is
-   probably *indirect*: a soybean price fall shifts acreage to corn the
-   following spring and pushes the corn price down with a one-year lag. A
-   corn-only direct-sales model would miss the larger effect. **Verify these
-   shares against ERS and Census data; they are recollection, not measurement.**
-2. **Node 3's coefficient was fitted on supply shocks.** Reusing b0 for a demand
-   shock assumes symmetry. Post-harvest supply is near-vertical so it is not
-   unreasonable, but it is an assumption that belongs in the output rather than
-   buried in a build script. Fitting a separate demand-side transmission is the
-   alternative and is more work; decide in the brief, with reasons.
-3. **A tariff is not a one-for-one sales loss.** See the modelling-honesty
-   section: take bushels, not tariff rates.
-4. **Announcement and expectation.** Once a tariff is known it is in the price.
-   Node 4 answers "what does this scenario imply against a no-tariff baseline",
-   which is not "what happens next". Say so in `not_for`, in the README and in
-   the output document -- all three, the way node 3 does.
+### The consequence nobody expected: nothing validates it
+
+Because both candidate episodes produced an aggregate bushel loss of roughly
+zero, **there is no historical trade episode this bundle can reproduce**, the
+way `corn-price` reproduces 2012. That is not a gap in the work; it is the
+model's own headline caveat showing up in its test plan. The check suite proves
+the arithmetic, the labelling and the loud failures instead, and the README says
+why. Do not let a later reviewer's reasonable request for a validated episode
+turn into a fitted number.
+
+### Verified results (2026-09-20)
+
+- `check_trade_policy.py`: **200/200 checks pass** (171 before the Copilot review).
+- **Sample run** (real node 1 -> node 2 -> node 3 chain, 300 mil bu scenario):
+  the scenario is +1.8541% of 16,180 mil bu of total use. Weather **-0.18%**
+  [-0.29, -0.09], carried through from node 3 unchanged. Trade **-1.44%**
+  [-2.33, -0.73]. Combined **-1.62%** [-2.61, -0.82] = **-$0.0777/bu** on $4.80.
+  The naive sum would have been -1.6206% against the correct -1.6179%.
+- **Docker build and run** produce output **identical** to the local run apart
+  from `generated_at`, with `--network none`. A bare `docker run` works from the
+  bundled samples.
+- **Modelfile validates** (`OK`, no annotation warnings), and
+  `check_schema_compatibility` confirms the first input **binds** node 3's
+  `corn_price_impact` and is **refused** by `corn_price_regions`,
+  `corn_yield_snapshot` and `corn_yield_trajectory`.
+- **Copilot review (PR #1):** four findings, all legitimate, all addressed. Two
+  were schema text that contradicted the runner's own supported behaviour -- a
+  field the runner always emits missing from `required`, and two share fields
+  documented as "from 0 to 1" when a negative scenario legitimately produces
+  negative shares. Two were real robustness holes: a falsey non-string
+  `scenario_label` was coerced to empty instead of rejected, and the upstream
+  bootstrap interval's elements reached `float()` unvalidated, so a malformed
+  bound exited with a traceback rather than a named `RunError`. Checks went
+  171 -> **200**. No committed table, coefficient or headline figure changed.
+- **Not yet verified:** the Model Home import, which needs a signed-in human at
+  the Auth0 login.
 
 ### Task list
 
-1. Write brief `docs/features/0001-corn-trade-policy.md`, resolving the four
-   questions above with John before planning.
-2. `/feat plan`, review, `/feat run`.
-3. Register on Model Home and compose after `corn-price` in the flow.
+1. Add the model on the local Model Home stack from the branch subfolder URL and
+   run it after `corn-price` in a flow, with the scenario wired as an `inline`
+   literal; mark the pull request ready once it passes.
+2. After merge: register on Model Home from `main` and compose after
+   `corn-price`.
+3. Upstream follow-up in `ag-commodity-bundles`: carry the ERS national trend
+   production (area harvested times trend yield) in node 3's output metadata, the
+   same way `export_exposure` was added for this model, and switch this model's
+   denominator to it.
+4. The soybean and acreage channel, as its own brief in this repo. The bundle
+   README's soybean section is its specification.
 
 ## Task list
 
 1. ~~Create `modelhome/ag-trade-bundles` with boilerplate and the vendored feat
    skill.~~ Done 2026-09-21.
-2. Brief, plan and build `corn-trade-policy/` (node 4).
+2. ~~Brief, plan and build `corn-trade-policy/` (node 4).~~ Done 2026-09-20;
+   see that bundle's task list above for what remains.
 3. Upstream follow-up in `ag-commodity-bundles`: `corn-price/README.md` gives
    the 2012 end-to-end result as -22.04% while its `CLAUDE.md` gives -21.92%.
    They cannot both be right.
