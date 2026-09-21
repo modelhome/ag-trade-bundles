@@ -140,7 +140,7 @@ Decisions taken while planning, under the brief's authority:
 | AC-12 | Every headline has `_low`/`_high`, ordered, for all three components | `runner.py::band`, `sorted([...])` | `check_intervals` -- 12 figures checked; combined interval is not the sum of the two intervals | pass |
 | AC-13 | Symmetry assumption in output, README and `not_for` | `runner.py` `assumptions.symmetry`; `README.md`; `Modelfile.toml` | `check_three_places` | pass |
 | AC-14 | Destination table built only by its script, with meta, failing loudly, excluding bad years, entering no arithmetic | `build_destinations.py`, `destinations.meta.json` | `check_destinations` -- 2,312 rows, 1992-2024, 1989/1990/1991 excluded at 98.9%/99.1%/34.3% | pass |
-| AC-15 | The check proves the enumerated modelling claims | `check_trade_policy.py` | **171/171 checks pass** | pass |
+| AC-15 | The check proves the enumerated modelling claims | `check_trade_policy.py` | **200/200 checks pass** | pass |
 | AC-16 | Table 22 world total ties out to the balance sheet for the same year | `build_destinations.py` tie-out assertion | recorded in `destinations.meta.json`: max relative error 2.1e-06 over 33 committed years (see DEV-2 for why this is a build-time rather than check-time comparison) | pass |
 | AC-17 | Scenario reported as a share of latest-complete exports and of total use, beside recent purchases | `runner.py` `scenario` block | `check_scenario_context` -- 1.85% of use, 8.76% of MY2025 exports, 9 destination entries | pass |
 | AC-18 | not-a-forecast, not-advice, not-a-political-forecast, scenario-is-an-input, reallocation -- all three places | `Modelfile.toml`, `README.md`, `runner.py` | `check_three_places` -- 6 statements x 3 places = 18 checks | pass |
@@ -155,7 +155,7 @@ bundle file existed.
 | Command | Purpose | Baseline result | Final result |
 |---|---|---|---|
 | `uv run --python 3.12 python corn-trade-policy/runner.py corn-trade-policy/sample_input.json corn-trade-policy/sample_scenario.json > $SP/impact.json` | the model runs end to end (AC-4) | no baseline: the runner did not exist | exit 0; weather -0.18%, trade -1.44%, combined -1.62% = -$0.0777/bu |
-| `uv run --python 3.12 python corn-trade-policy/check_trade_policy.py $SP/impact.json` | the modelling claims (AC-3, 6-18, 20) | no baseline: the check did not exist | **171/171 checks pass**, exit 0 |
+| `uv run --python 3.12 python corn-trade-policy/check_trade_policy.py $SP/impact.json` | the modelling claims (AC-3, 6-18, 20) | no baseline: the check did not exist | **200/200 checks pass**, exit 0 |
 | `cd /Users/john/repos/modelhome && uv run python -m orchestration.modelfile validate <abs path>/corn-trade-policy/Modelfile.toml` | Modelfile structure and annotations (AC-19) | tool confirmed usable: returns `OK` on node 3's Modelfile | `OK`, exit 0, no annotation warnings |
 | `cd corn-trade-policy && docker build -t ag-trade-corn-trade-policy:local .` | the image builds from the bundle folder as its own context (AC-5) | no baseline: no Dockerfile | exit 0 |
 | `docker run --rm --network none -v "$PWD/run:/run" ag-trade-corn-trade-policy:local /run/corn_price_impact.json /run/scenario.json`, diffed against the local run ignoring `generated_at` | offline determinism (AC-5) | no baseline: no image | **identical** apart from `generated_at`; a bare `docker run` also works from the bundled samples |
@@ -308,6 +308,37 @@ Four, all recorded while implementing and none changing the agreed design.
   README, so `not a price forecast` failed purely because the phrase spanned a
   line break. That was a defect in the check, not the document: a documentation
   assertion must not depend on where a paragraph wraps.
+
+## Review findings
+
+Copilot review on pull request #1: **four findings, all legitimate, all
+addressed**, each with a check so it cannot regress. Checks went 171 -> **200**.
+No committed table, coefficient or headline figure changed.
+
+- **R-1 -- `share_of_latest_complete_exports` was missing from the scenario
+  object's `required` list.** The runner always emits it and AC-17 promises it,
+  but a consumer validating against the declared schema alone could not rely on
+  it. Added to `required`, with a check asserting that every field the runner
+  always emits inside `scenario` is declared required, and that the emitted
+  document carries every required key.
+- **R-2 -- the two share fields were documented as "from 0 to 1" while the
+  runner supports negative scenarios.** Extra sales produce negative shares, so
+  the schema text promised a range the model does not keep. Both descriptions now
+  say the shares are signed, and the export share documents the ceiling as
+  applying in either direction. Checked twice: the descriptions must say
+  "signed" and must not say "from 0 to 1", and a negative scenario must actually
+  report negative shares.
+- **R-3 -- `raw.get("scenario_label") or ""` silently coerced falsey
+  non-strings.** A label of `0`, `False` or `[]` became an empty label and was
+  accepted, while `123` was correctly rejected -- an inconsistency that let a
+  document violating the declared string schema through. Absence is now handled
+  before the type check. Checked against all four falsey non-string forms.
+- **R-4 -- the upstream interval's elements were passed to `float()`
+  unvalidated.** A malformed bound such as `["bad", 1]` exited with an uncaught
+  `ValueError` traceback, contradicting the runner's loud, traceback-free failure
+  contract, and a non-finite bound would have propagated into the published
+  ranges. Both elements are now validated as finite numbers with a named
+  `RunError`. Checked against a string, a null, a NaN and an infinity.
 
 ## Risks and follow-ups
 

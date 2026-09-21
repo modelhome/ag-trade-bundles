@@ -181,9 +181,17 @@ def read_scenario(raw):
             )
         bushels = float(value)
 
-    label = raw.get("scenario_label") or ""
-    if not isinstance(label, str):
-        raise RunError(f"scenario_label is {label!r}, which is not a string")
+    # `or ""` would coerce a falsey non-string -- 0, False, [] -- to an empty
+    # label and accept a document that violates the declared string schema,
+    # while 123 would be rejected. Absence is handled first, then the type.
+    label = raw.get("scenario_label")
+    if label is None or label == "":
+        label = ""
+    elif not isinstance(label, str):
+        raise RunError(
+            f"scenario_label is {label!r}, which is not a string. Leave it out "
+            "or pass text; it is carried into the output as written."
+        )
 
     return bushels, label.strip()
 
@@ -268,7 +276,26 @@ def process(upstream, bushels_not_sold_mil_bu, scenario_label, destinations, des
             f"metadata.transmission.shock_coefficient_ci95 is {ci95!r}; it must "
             "be a two-element interval"
         )
-    b0_low, b0_high = (float(ci95[0]), float(ci95[1]))
+    # Every range this model publishes comes from these two numbers, so they are
+    # validated rather than passed to float() and allowed to raise. A bare
+    # float("bad") would exit with a traceback, and a non-finite bound would
+    # propagate silently into the published low and high figures.
+    bounds = []
+    for index, value in enumerate(ci95):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise RunError(
+                f"metadata.transmission.shock_coefficient_ci95[{index}] is "
+                f"{value!r}, which is not a number: every published range comes "
+                "from that bootstrap interval"
+            )
+        if not math.isfinite(value):
+            raise RunError(
+                f"metadata.transmission.shock_coefficient_ci95[{index}] is "
+                f"{value!r}, which is not finite: a range cannot be published "
+                "from it"
+            )
+        bounds.append(float(value))
+    b0_low, b0_high = bounds
 
     exposure_current = require(
         upstream, "metadata.export_exposure.current",

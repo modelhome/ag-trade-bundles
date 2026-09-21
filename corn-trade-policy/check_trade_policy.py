@@ -293,6 +293,10 @@ def check_signs(document):
 
     code, gained, _ = run_case(upstream, {"bushels_not_sold_mil_bu": -300})
     check("an extra-sales scenario runs", code == 0)
+    check("an extra-sales scenario reports signed, negative shares",
+          gained["scenario"]["share_of_total_use"] < 0
+          and gained["scenario"]["share_of_latest_complete_exports"] < 0,
+          f"{gained['scenario']['share_of_total_use']:.4%} of use")
     check("demand added pushes the price UP",
           gained["national"]["trade"]["price_impact_pct"] > 0,
           f"{gained['national']['trade']['price_impact_pct']:+.4f}%")
@@ -517,6 +521,23 @@ def check_loud_failures():
     expect_failure("a scenario that is not an object", upstream, [300],
                    "not an object")
 
+    # A falsey non-string label violates the declared string schema just as
+    # surely as 123 does, and must not be quietly coerced to an empty label.
+    for bad_label in (0, False, [], {}):
+        expect_failure(f"a scenario_label of {bad_label!r}", upstream,
+                       {"bushels_not_sold_mil_bu": 300, "scenario_label": bad_label},
+                       "scenario_label")
+
+    # Every published range comes from the upstream interval, so a malformed or
+    # non-finite bound must stop the run rather than reach sorted() or the
+    # output. float("bad") would otherwise exit with a traceback.
+    for bad_ci in (["bad", 1], [None, -0.4], [float("nan"), -0.4],
+                   [-1.27, float("inf")]):
+        broken = json.loads(json.dumps(upstream))
+        broken["metadata"]["transmission"]["shock_coefficient_ci95"] = bad_ci
+        expect_failure(f"an upstream interval of {bad_ci!r}", broken, good,
+                       "shock_coefficient_ci95")
+
     # A scenario exactly at the ceiling is coherent and must still run.
     code, doc, _ = run_case(upstream, {"bushels_not_sold_mil_bu": ceiling})
     check("a scenario exactly at the ceiling still runs", code == 0, f"exit {code}")
@@ -636,6 +657,33 @@ def check_annotations(document):
 
     check("the declared output name matches what the run line redirects to",
           "corn_trade_policy_impact.output.json" in model["run"])
+
+    # A consumer validating against the declared schema alone must be able to
+    # rely on the market context AC-17 promises, so anything the runner always
+    # emits inside `scenario` belongs in that object's required list.
+    scenario_schema = (outputs["corn_trade_policy_impact"]["schema"]
+                       ["properties"]["scenario"])
+    scenario_required = set(scenario_schema["required"])
+    always_emitted = {
+        "bushels_not_sold_mil_bu", "equivalent_supply_shock_pct",
+        "share_of_total_use", "share_of_latest_complete_exports",
+        "measured_against", "stated_by",
+    }
+    check("every scenario field the runner always emits is declared required",
+          always_emitted <= scenario_required,
+          f"missing: {sorted(always_emitted - scenario_required)}"
+          if always_emitted - scenario_required else "")
+    check("the scenario document carries every key the schema requires",
+          scenario_required <= set(document["scenario"]),
+          f"absent: {sorted(scenario_required - set(document['scenario']))}"
+          if scenario_required - set(document["scenario"]) else "")
+
+    # The shares are signed, because a negative scenario (extra sales) is
+    # supported. The schema text must not promise a 0..1 range it does not keep.
+    for field in ("share_of_total_use", "share_of_latest_complete_exports"):
+        text = scenario_schema["properties"][field]["description"].lower()
+        check(f"{field} is documented as signed, not as 0 to 1",
+              "signed" in text and "from 0 to 1" not in text)
 
 
 # ----------------------------------------------------- documentation (AC-20)

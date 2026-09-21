@@ -174,7 +174,7 @@ description = "How the run was made: the upstream transmission and the symmetry 
 
 [outputs.schema.properties.scenario]
 type = "object"
-required = ["bushels_not_sold_mil_bu", "equivalent_supply_shock_pct", "share_of_total_use", "measured_against", "stated_by"]
+required = ["bushels_not_sold_mil_bu", "equivalent_supply_shock_pct", "share_of_total_use", "share_of_latest_complete_exports", "measured_against", "stated_by"]
 description = "What was assumed, and how big it is against the market it was measured in."
 
 [outputs.schema.properties.scenario.properties.bushels_not_sold_mil_bu]
@@ -193,11 +193,11 @@ description = "The scenario as a proportional shock: demand removed is equivalen
 
 [outputs.schema.properties.scenario.properties.share_of_total_use]
 type = "number"
-description = "The scenario as a share of total US corn use for the current marketing year, from 0 to 1."
+description = "The scenario as a share of total US corn use for the current marketing year. Signed: negative when the scenario adds sales rather than removing them."
 
 [outputs.schema.properties.scenario.properties.share_of_latest_complete_exports]
 type = "number"
-description = "The scenario as a share of all US corn exports in the latest complete marketing year, from 0 to 1. Above 1 the run fails: there is not that much export demand to lose."
+description = "The scenario as a share of all US corn exports in the latest complete marketing year. Signed, like the share above. Beyond 1 in either direction the run fails: there is not that much export demand to lose or to add."
 
 [outputs.schema.properties.scenario.properties.measured_against]
 type = "object"

@@ -354,7 +354,7 @@ turn into a fitted number.
 
 ### Verified results (2026-09-20)
 
-- `check_trade_policy.py`: **171/171 checks pass**.
+- `check_trade_policy.py`: **200/200 checks pass** (171 before the Copilot review).
 - **Sample run** (real node 1 -> node 2 -> node 3 chain, 300 mil bu scenario):
   the scenario is +1.8541% of 16,180 mil bu of total use. Weather **-0.18%**
   [-0.29, -0.09], carried through from node 3 unchanged. Trade **-1.44%**
@@ -367,6 +367,15 @@ turn into a fitted number.
   `check_schema_compatibility` confirms the first input **binds** node 3's
   `corn_price_impact` and is **refused** by `corn_price_regions`,
   `corn_yield_snapshot` and `corn_yield_trajectory`.
+- **Copilot review (PR #1):** four findings, all legitimate, all addressed. Two
+  were schema text that contradicted the runner's own supported behaviour -- a
+  field the runner always emits missing from `required`, and two share fields
+  documented as "from 0 to 1" when a negative scenario legitimately produces
+  negative shares. Two were real robustness holes: a falsey non-string
+  `scenario_label` was coerced to empty instead of rejected, and the upstream
+  bootstrap interval's elements reached `float()` unvalidated, so a malformed
+  bound exited with a traceback rather than a named `RunError`. Checks went
+  171 -> **200**. No committed table, coefficient or headline figure changed.
 - **Not yet verified:** the Model Home import, which needs a signed-in human at
   the Auth0 login.
 
