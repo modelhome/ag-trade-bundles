@@ -259,8 +259,10 @@ corn-trade-policy/
   destinations.meta.json    provenance, the tie-out and the excluded years
   build_destinations.py     one-time destination-table build (not in the image)
   check_trade_policy.py     validation, needs Python 3.11+ (not in the image)
-  sample_input.json         a real node 3 corn_price_impact
-  sample_scenario.json      the illustrative 300 mil bu scenario
+  sample_corn_price_impact.json  a real node 3 corn_price_impact (input 1)
+  sample_scenario.json      the illustrative 300 mil bu scenario (input 2)
+  sample_payload.json       both of the above under their declared input names,
+                            for the platform's run form (not in the image)
   README.md
 ```
 

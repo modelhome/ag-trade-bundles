@@ -48,7 +48,8 @@ except ModuleNotFoundError:  # pragma: no cover - only on Python < 3.11
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_OUTPUT = HERE.parent / "run" / "corn_trade_policy_impact.output.json"
-SAMPLE = HERE / "sample_input.json"
+SAMPLE = HERE / "sample_corn_price_impact.json"
+PAYLOAD = HERE / "sample_payload.json"
 SCENARIO = HERE / "sample_scenario.json"
 RUNNER = HERE / "runner.py"
 MODELFILE = HERE / "Modelfile.toml"
@@ -118,9 +119,44 @@ def check_files():
     for name in (
         "Modelfile.toml", "Dockerfile", "runner.py", "build_destinations.py",
         "destinations.csv", "destinations.meta.json", "check_trade_policy.py",
-        "sample_input.json", "sample_scenario.json", "README.md",
+        "sample_corn_price_impact.json", "sample_scenario.json",
+        "sample_payload.json", "README.md",
     ):
         check(f"{name} exists", (HERE / name).exists())
+
+
+def check_sample_payload():
+    """The keyed envelope the platform's run form takes.
+
+    This model declares TWO inputs, so the run form asks for one slot per input
+    name rather than a single document -- which is exactly what makes a file
+    called "the sample input" misleading here. The envelope is committed so
+    there is something to paste, and it is a DERIVED artifact, so the checks
+    below are about drift: its keys must be the declared input names, and its
+    values must be the two committed sample files byte for byte.
+    """
+    print("\nthe run form's keyed envelope")
+    if not check("sample_payload.json exists", PAYLOAD.exists()):
+        return
+    try:
+        payload = json.loads(PAYLOAD.read_text())
+    except json.JSONDecodeError as exc:
+        check("sample_payload.json is valid JSON", False, str(exc))
+        return
+    check("sample_payload.json is valid JSON", True)
+
+    declared = [i["name"] for i in tomllib.loads(MODELFILE.read_text())["inputs"]]
+    check("its keys are exactly the model's declared input names",
+          set(payload) == set(declared),
+          f"payload {sorted(payload)} against declared {sorted(declared)}")
+    check("it carries the committed upstream sample unchanged",
+          payload.get("corn_price_impact") == json.loads(SAMPLE.read_text()))
+    check("it carries the committed scenario unchanged",
+          payload.get("scenario") == json.loads(SCENARIO.read_text()))
+    # The envelope is a paste target, not a runner input: runner.py takes the two
+    # documents as separate paths and never reads this file.
+    check("the runner does not read the envelope",
+          "sample_payload" not in RUNNER.read_text())
 
 
 # --------------------------------------------- the committed table (AC-14/16)
@@ -722,6 +758,7 @@ def main(argv):
         document = json.loads(path.read_text())
 
     check_files()
+    check_sample_payload()
     check_destinations(document)
     check_denominator(document)
     check_zero_scenario(document)

@@ -30,7 +30,7 @@ It does not convert a tariff rate into lost sales, and deliberately cannot. See
 
 ```bash
 cd corn-trade-policy
-python runner.py sample_input.json sample_scenario.json > impact.json
+python runner.py sample_corn_price_impact.json sample_scenario.json > impact.json
 ```
 
 ```bash
@@ -89,6 +89,40 @@ independently, so a second input does not have to come from the step before.
 `required = []`, with the defaults in the runner, so an absent, empty, null or
 zero scenario gives a trade component of **exactly zero** and the combined
 figure equals node 3's weather figure. The bundle runs standalone.
+
+### Filling in the run form
+
+This model declares **two** inputs, so Model Home asks for one slot per input
+name rather than for a single document:
+
+```json
+{ "corn_price_impact": null, "scenario": null }
+```
+
+`sample_corn_price_impact.json` is the value for the **first slot only**. Paste
+it there and the scenario into the second, or paste the whole envelope at once:
+**`sample_payload.json`** is exactly that, the two committed samples under their
+declared input names.
+
+```json
+{
+  "corn_price_impact": { "generated_at": "...", "metadata": {}, "national": {}, "regions": [], "assumptions": {} },
+  "scenario": { "bushels_not_sold_mil_bu": 300, "scenario_label": "..." }
+}
+```
+
+The platform also accepts one link standing in for the whole set, returning that
+same object. `sample_payload.json` is a paste target for the form; `runner.py`
+never reads it, because it takes the two documents as separate paths.
+
+**In a flow you paste nothing**: `corn_price_impact` is wired from the
+`corn-price` step's output and `scenario` is the `inline` literal you supply.
+That is the path this bundle is built around.
+
+The upstream input deliberately ships **no** schema `default`, because a
+runnable example for it is a whole upstream document -- so the platform shows a
+placeholder shape for it rather than calling it an example to paste. The
+scenario input does ship one.
 
 ## Why bushels, not tariffs
 

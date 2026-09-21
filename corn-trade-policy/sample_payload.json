@@ -1,0 +1,305 @@
+{
+  "corn_price_impact": {
+    "generated_at": "2026-09-21T05:00:27+00:00",
+    "metadata": {
+      "date": "2026-09-20",
+      "model": "US Corn Price Impact (ag-commodity-bundles/corn-price)",
+      "node": "3 of the climate -> agriculture -> finance flow",
+      "determinism": "Deterministic and offline: a pure function of the input document and the committed tables. No network calls, no randomness, no wall-clock dependence.",
+      "observed_yield_window": "1995-2024",
+      "transmission": {
+        "shock_coefficient": -0.7825520359332104,
+        "shock_coefficient_ci95": [
+          -1.2692876977379075,
+          -0.39320352506264733
+        ],
+        "terms": [
+          "intercept",
+          "shock",
+          "deviation_lag"
+        ],
+        "coefficients": {
+          "intercept": 0.010563324902938976,
+          "shock": -0.7825520359332104,
+          "deviation_lag": 0.9690915495685591
+        },
+        "fit": {
+          "n": 50,
+          "df": 47,
+          "r2": 0.328940679814806,
+          "adj_r2": 0.3003849640622446,
+          "residual_sd_dlog": 0.1656598401460886,
+          "sample_period": "1976-2025",
+          "residual_quantiles_dlog": {
+            "p05": -0.22017350291543045,
+            "p50": -0.021631251211415688,
+            "p95": 0.28550646439134486
+          }
+        },
+        "sources": [
+          "USDA ERS Feed Grains Database, Feed Grains Yearbook Tables -- All Years",
+          "Roberts, M. J. and W. Schlenker (2013), American Economic Review 103(6), 2265-95",
+          "farmdoc daily (8):212, University of Illinois, 15 November 2018"
+        ],
+        "reference_estimates_not_used": {
+          "roberts_schlenker_2013": "Supply elasticity 0.087-0.116, demand -0.028 to -0.066 (Table 1, FAO data), implying a price multiplier 1/(beta_s - beta_d) of 5.75-7.73. Derived for a permanent shift in world caloric supply, not a transitory weather shock, so it is not applied here.",
+          "farmdoc_daily_2018": "-1.84 percent price change per percent yield change, R-squared 0.48, 1993-2017, December corn futures against the May-to-November WASDE yield change. Its regressor is the surprise against market expectation, not against a weather baseline, so it is not applied here."
+        },
+        "built_at": "2026-09-21T00:19:16+00:00"
+      },
+      "tables": {
+        "production_weights": {
+          "vintage": "USDA NASS 2022 Census of Agriculture",
+          "source": "https://www.nass.usda.gov/datasets/qs.census2022.txt.gz",
+          "source_last_modified": "Wed, 14 Feb 2024 19:25:51 GMT",
+          "built_at": "2026-09-20T05:19:49+00:00",
+          "coverage_share_of_us_all_ten": 0.824706
+        },
+        "yield_history": {
+          "vintage": "USDA NASS Quick Stats survey series",
+          "source": "https://www.nass.usda.gov/datasets/qs.crops_20260919.txt.gz",
+          "source_last_modified": null,
+          "period": "1995-2024",
+          "built_at": "2026-09-20T05:21:22+00:00"
+        },
+        "price_history": {
+          "vintage": "USDA ERS Feed Grains Database, Feed Grains Yearbook Tables -- All Years",
+          "source": "https://www.ers.usda.gov/media/5766/feed-grains-yearbook-tables-all-years.csv",
+          "source_last_modified": null,
+          "period": "1975-2026",
+          "built_at": "2026-09-21T00:19:16+00:00",
+          "latest_complete_marketing_year": 2025
+        }
+      },
+      "reference_price": {
+        "usd_bu": 4.8,
+        "source": "USDA ERS Feed Grains Database, Feed Grains Yearbook Tables -- All Years, marketing year 2026 (WASDE projection, not an outcome)"
+      },
+      "export_exposure": {
+        "current": {
+          "marketing_year": 2026,
+          "exports_mil_bu": 3275.0,
+          "export_share_of_use": 0.20241,
+          "is_projection": true
+        },
+        "latest_complete": {
+          "marketing_year": 2025,
+          "exports_mil_bu": 3425.0,
+          "export_share_of_use": 0.205336,
+          "is_projection": false
+        },
+        "role": "context only. Exports are a component of total use, never an addition to it. This model's transmission is fitted on supply-side weather shocks and prices no trade scenario of any kind; see assumptions.not_captured."
+      },
+      "carryin_stocks_to_use": {
+        "value": 0.115218,
+        "marketing_year": 2026,
+        "role": "context only. Every stocks-to-use form tried came out statistically indistinguishable from zero in this specification, so the shipped transmission does not condition on it."
+      },
+      "upstream": {
+        "model": "wofost-bundles/corn-yield (node 2)",
+        "date": "2026-09-20",
+        "generated_at": "2026-09-20T03:09:25+00:00",
+        "baseline_period": "1995-2024",
+        "wofost_engine": "Wofost72_WLP_FD (water-limited, free-draining)",
+        "yield_anomaly_definition": "(projection - baseline) / baseline x 100, where the projection is this season's Wofost72_WLP_FD run and the baseline is the median of the same run repeated over each year of 1995-2024 on that year's real daily weather, with identical soil, planting date, variety and engine. Using the same uncalibrated parameters throughout cancels most of the calibration error. yield_percentile_rank gives the projection's place in that distribution, which is the more robust statistic where the distribution is skewed."
+      }
+    },
+    "national": {
+      "date": "2026-09-20",
+      "regions_covered": 10,
+      "coverage_share_of_us_production": 0.824706,
+      "covered_yield_shock_pct": 0.2793,
+      "us_yield_shock_pct": 0.2303,
+      "us_yield_shock_pct_unmapped": 3.6994,
+      "covered_trend_production_bu": 12283029356.0,
+      "covered_production_shock_bu": 34306501.0,
+      "us_trend_production_bu": 14893828051.0,
+      "us_production_shock_bu": 34306501.0,
+      "price_impact_pct": -0.1801,
+      "price_impact_pct_low": -0.2919,
+      "price_impact_pct_high": -0.0905,
+      "reference_price_usd_bu": 4.8,
+      "price_impact_usd_bu": -0.0086,
+      "price_impact_usd_bu_low": -0.014,
+      "price_impact_usd_bu_high": -0.0043
+    },
+    "regions": [
+      {
+        "region_key": "ia",
+        "state": "IA",
+        "date": "2026-09-20",
+        "yield_percentile_rank": 70.0,
+        "yield_anomaly_simulated_pct": 22.02,
+        "yield_anomaly_real_pct": 1.099,
+        "dispersion_ratio": 6.57,
+        "irrigated_share": 0.0123,
+        "acres_harvested": 12637070.0,
+        "trend_yield_bu_acre": 211.09,
+        "production_share_of_us": 0.18302,
+        "production_weight": 0.217173,
+        "contribution_pct": 0.2387
+      },
+      {
+        "region_key": "il",
+        "state": "IL",
+        "date": "2026-09-20",
+        "yield_percentile_rank": 50.0,
+        "yield_anomaly_simulated_pct": 1.9,
+        "yield_anomaly_real_pct": 0.0,
+        "dispersion_ratio": 6.03,
+        "irrigated_share": 0.0333,
+        "acres_harvested": 10421518.0,
+        "trend_yield_bu_acre": 215.15,
+        "production_share_of_us": 0.156188,
+        "production_weight": 0.182547,
+        "contribution_pct": 0.0
+      },
+      {
+        "region_key": "in",
+        "state": "IN",
+        "date": "2026-09-20",
+        "yield_percentile_rank": 83.3,
+        "yield_anomaly_simulated_pct": 25.97,
+        "yield_anomaly_real_pct": 4.3533,
+        "dispersion_ratio": 5.66,
+        "irrigated_share": 0.0634,
+        "acres_harvested": 5376022.0,
+        "trend_yield_bu_acre": 198.95,
+        "production_share_of_us": 0.075768,
+        "production_weight": 0.087076,
+        "contribution_pct": 0.3791
+      },
+      {
+        "region_key": "ks",
+        "state": "KS",
+        "date": "2026-09-20",
+        "yield_percentile_rank": 40.0,
+        "yield_anomaly_simulated_pct": -39.89,
+        "yield_anomaly_real_pct": -2.778,
+        "dispersion_ratio": 9.9,
+        "irrigated_share": 0.2536,
+        "acres_harvested": 4658341.0,
+        "trend_yield_bu_acre": 126.78,
+        "production_share_of_us": 0.035453,
+        "production_weight": 0.048082,
+        "contribution_pct": -0.1336
+      },
+      {
+        "region_key": "mn",
+        "state": "MN",
+        "date": "2026-09-20",
+        "yield_percentile_rank": 30.0,
+        "yield_anomaly_simulated_pct": -41.84,
+        "yield_anomaly_real_pct": -5.4489,
+        "dispersion_ratio": 5.33,
+        "irrigated_share": 0.0392,
+        "acres_harvested": 7732455.0,
+        "trend_yield_bu_acre": 196.39,
+        "production_share_of_us": 0.10774,
+        "production_weight": 0.123633,
+        "contribution_pct": -0.6737
+      },
+      {
+        "region_key": "mo",
+        "state": "MO",
+        "date": "2026-09-20",
+        "yield_percentile_rank": 60.0,
+        "yield_anomaly_simulated_pct": 12.53,
+        "yield_anomaly_real_pct": 5.7839,
+        "dispersion_ratio": 3.07,
+        "irrigated_share": 0.0939,
+        "acres_harvested": 3015286.0,
+        "trend_yield_bu_acre": 169.25,
+        "production_share_of_us": 0.034052,
+        "production_weight": 0.041548,
+        "contribution_pct": 0.2403
+      },
+      {
+        "region_key": "ne",
+        "state": "NE",
+        "date": "2026-09-20",
+        "yield_percentile_rank": 80.0,
+        "yield_anomaly_simulated_pct": 51.9,
+        "yield_anomaly_real_pct": 4.1226,
+        "dispersion_ratio": 11.66,
+        "irrigated_share": 0.5266,
+        "acres_harvested": 8648207.0,
+        "trend_yield_bu_acre": 196.3,
+        "production_share_of_us": 0.104721,
+        "production_weight": 0.13821,
+        "contribution_pct": 0.5698
+      },
+      {
+        "region_key": "oh",
+        "state": "OH",
+        "date": "2026-09-20",
+        "yield_percentile_rank": 50.0,
+        "yield_anomaly_simulated_pct": -0.47,
+        "yield_anomaly_real_pct": 0.0,
+        "dispersion_ratio": 4.17,
+        "irrigated_share": 0.0046,
+        "acres_harvested": 3314064.0,
+        "trend_yield_bu_acre": 191.6,
+        "production_share_of_us": 0.044353,
+        "production_weight": 0.051694,
+        "contribution_pct": 0.0
+      },
+      {
+        "region_key": "sd",
+        "state": "SD",
+        "date": "2026-09-20",
+        "yield_percentile_rank": 26.7,
+        "yield_anomaly_simulated_pct": -43.74,
+        "yield_anomaly_real_pct": -3.8821,
+        "dispersion_ratio": 9.23,
+        "irrigated_share": 0.0351,
+        "acres_harvested": 4803202.0,
+        "trend_yield_bu_acre": 164.09,
+        "production_share_of_us": 0.044566,
+        "production_weight": 0.064165,
+        "contribution_pct": -0.2491
+      },
+      {
+        "region_key": "wi",
+        "state": "WI",
+        "date": "2026-09-20",
+        "yield_percentile_rank": 40.0,
+        "yield_anomaly_simulated_pct": -14.75,
+        "yield_anomaly_real_pct": -2.0102,
+        "dispersion_ratio": 6.62,
+        "irrigated_share": 0.0467,
+        "acres_harvested": 3065380.0,
+        "trend_yield_bu_acre": 183.81,
+        "production_share_of_us": 0.038845,
+        "production_weight": 0.045872,
+        "contribution_pct": -0.0922
+      }
+    ],
+    "assumptions": {
+      "not_a_forecast": "This is the corn price impact implied by a weather-driven production shock under the stated transmission, holding everything else equal. It is not a price forecast, not a trading signal and not investment advice. The transmission explains only part of what moves the corn price; see fit.r2 and interval_definition.",
+      "rescaling": "Node 2's yield_anomaly_pct is a simulated, uncalibrated, rainfed anomaly whose thirty-year distribution is far wider than an observed one, so it is not used as a magnitude. Each region's yield_percentile_rank is read as the same quantile of that state's observed detrended yield distribution over 1995-2024, measured against that distribution's median so an unremarkable season maps to zero (quantile mapping). yield_anomaly_simulated_pct and dispersion_ratio ship per region, and us_yield_shock_pct_unmapped shows what the national figure would have been without the rescaling, so the correction is auditable from this document.",
+      "weighting": "Relative anomalies are combined with production weights: harvested acres (2022 Census) times the state's fitted trend yield for this calendar year. Actual 2022 production is not used as the weight because it embeds 2022's own drought in the western states.",
+      "coverage": "The regions present are 82.47% of US corn-for-grain production. us_yield_shock_pct assumes the remaining acres are at trend and contribute no shock. The figure is never scaled up to 100%.",
+      "trend": "Node 2's baseline is fixed-weather and carries no yield trend by design, so the trend is applied here: per-state ordinary least squares on the observed 1995-2024 series, evaluated at 2026.",
+      "irrigation": "Node 2 simulates every region as rainfed. Quantile mapping absorbs most of the resulting bias, because a state's observed distribution already contains its irrigated acres; irrigated_share ships per region so the exposure is visible. It does not remove the bias: a rainfed simulation can rank an irrigated state's dry year too low, and the mapping carries that rank faithfully.",
+      "transmission": "dlog_price[t] = a + b0 * d[t] + c_deviation_lag * deviation_lag[t]; d = national yield deviation from a fitted linear trend, as a fraction",
+      "transmission_reported_effect": "b0 * d: the marginal price response to this season's shock, holding the other terms fixed. Deliberately NOT a prediction of the price change, which would require the rest of the balance sheet, demand, policy and the macro environment. The other terms are controls and do not enter the reported impact.",
+      "transmission_selection": "forward selection: a candidate term is kept only if |t| >= 2.0. The rule was fixed before the fits were run and applied to every candidate.",
+      "stocks_to_use_finding": "Every stocks-to-use form tried -- shock divided by carry-in, shock times log carry-in, and log carry-in alone -- came out statistically indistinguishable from zero (|t| < 0.1 in each case). This is not a refutation of the well-documented convex relationship between stocks-to-use and the price LEVEL: the dependent variable here is a year-on-year CHANGE, which differences that level relationship away. The interaction is therefore absent from the shipped model, and the model does not claim a tight-stocks amplification it cannot demonstrate.",
+      "interval_definition": "The reported low and high come from the bootstrap 95% interval on b0, the transmission coefficient. They express how well the transmission itself is known from fifty annual observations. They are NOT an interval on what the corn price will do: the fit explains 33% of year-on-year price variation, so most of what moves the price is outside this model entirely.",
+      "not_captured": [
+        "cross-commodity substitution: soybean and wheat prices move too, and corn acreage responds in the following season",
+        "the ethanol and export demand channels separately; the reduced form sees only their aggregate",
+        "export demand shocks. The fit is on supply-side weather shocks: a shift in export demand, whatever causes it, is outside what this coefficient was estimated on, and applying it to one assumes a symmetry the fit does not demonstrate",
+        "trade policy. Tariffs, retaliation and export restrictions are absent entirely. Shocks of that kind are a handful of episodes in this 50-year window, too few to fit a term on under the selection rule above, and they move the price on announcement rather than over a marketing year. The committed export exposure in the output metadata is context for a separate downstream model, not something this transmission prices",
+        "basis and the futures curve; the fit is on a cash marketing-year average price",
+        "policy shocks, including changes to the Renewable Fuel Standard",
+        "when within the season the price moves; this is an annual relationship"
+      ]
+    }
+  },
+  "scenario": {
+    "bushels_not_sold_mil_bu": 300,
+    "scenario_label": "illustrative: 300 mil bu of export demand removed, stated by the user"
+  }
+}
