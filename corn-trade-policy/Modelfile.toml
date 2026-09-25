@@ -119,11 +119,11 @@ description = "The high end in dollars a bushel, carried through."
 
 [inputs.schema.properties.regions]
 type = "array"
-description = "The upstream per-region contributions. This model is national only and does not read them; they are part of the document it binds to."
+description = "The upstream per-region contributions. Carried through unchanged into upstream_price_impact for reference; this model never joins on them, attributes nothing to them and uses none of them in its arithmetic."
 
 [inputs.schema.properties.assumptions]
 type = "object"
-description = "The upstream assumptions. Its not_captured list is carried into this model's own, so a reader sees both models' limits in one place."
+description = "The upstream assumptions. Its not_captured list is carried into this model's own, so a reader sees both models' limits in one place, and the whole object is carried through unchanged into upstream_price_impact."
 
 [[inputs]]
 # The scenario. In a flow this is an `inline` literal the flow author supplies:
@@ -150,17 +150,22 @@ type = "string"
 description = "Optional. A short note saying what the scenario represents, carried into the output so a reader knows where the number came from."
 
 [[outputs]]
-# One document, national only. Export demand is a national quantity and there is
-# no defensible way to attribute a lost cargo to one state rather than another,
-# so this model does no region join at all. The required-key set includes
-# `scenario`, which keeps it distinguishable from the upstream document for any
-# further step downstream.
+# One document, national for the trade scenario. Export demand is a national
+# quantity and there is no defensible way to attribute a lost cargo to one state
+# rather than another, so this model does no region join at all. It does carry
+# the upstream regions through, unchanged and nested under
+# `upstream_price_impact`, so the flow's last output shows the per-region weather
+# evidence; nothing is attributed to them. The block is nested rather than put at
+# the top level on purpose: a top-level `regions` key would bring this document's
+# required keys within one of the upstream document's, and flow steps bind by
+# required-key set. The required-key set includes `scenario`, which keeps it
+# distinguishable from the upstream document for any further step downstream.
 name = "corn_trade_policy_impact"
-description = "The corn price impact a stated export-demand scenario implies, reported beside the weather-driven impact: the scenario as a share of the market, both components with their ranges, the combined figure, and every assumption behind them."
+description = "The corn price impact a stated export-demand scenario implies, reported beside the weather-driven impact: the scenario as a share of the market, both components with their ranges, the combined figure, and every assumption behind them, with the upstream price model's per-region result carried through for reference."
 
 [outputs.schema]
 type = "object"
-required = ["generated_at", "metadata", "scenario", "national", "assumptions"]
+required = ["generated_at", "metadata", "scenario", "national", "assumptions", "upstream_price_impact"]
 description = "The price impact implied by a stated trade scenario. Not a forecast, and not a prediction of policy."
 
 [outputs.schema.properties.generated_at]
@@ -407,3 +412,32 @@ description = "The effects this model leaves out, named one by one, including th
 [outputs.schema.properties.assumptions.properties.not_captured.items]
 type = "string"
 description = "One effect the model does not capture."
+
+[outputs.schema.properties.upstream_price_impact]
+# Node 3's own regions, national and assumptions, copied from the input exactly
+# as received. Only the three members are declared here, not the fields inside
+# them: those belong to node 3's Modelfile (ag-commodity-bundles/corn-price),
+# and a copy here would go stale the next time node 3 adds a field.
+type = "object"
+required = ["source", "regions", "national", "assumptions"]
+description = "The upstream US Corn Price Impact model's result, carried through unchanged for reference: the evidence behind the weather component. Not recomputed here, and not an input to any other figure in this document."
+
+[outputs.schema.properties.upstream_price_impact.properties.source]
+type = "string"
+description = "Says in words that this block is the upstream model's result, carried through and not recomputed, and that its per-region rows describe the weather, not the trade scenario."
+
+[outputs.schema.properties.upstream_price_impact.properties.regions]
+type = "array"
+description = "The upstream per-region rows, exactly as received: each region's yield anomaly, production weight and contribution to the national weather shock. Field definitions are in the US Corn Price Impact model's output schema. The trade scenario is national and is attributed to none of them."
+
+[outputs.schema.properties.upstream_price_impact.properties.regions.items]
+type = "object"
+description = "One upstream region row, unchanged."
+
+[outputs.schema.properties.upstream_price_impact.properties.national]
+type = "object"
+description = "The upstream national result, exactly as received. Its price figures repeat those in national.weather above and agree with them by construction."
+
+[outputs.schema.properties.upstream_price_impact.properties.assumptions]
+type = "object"
+description = "The upstream assumptions, exactly as received."

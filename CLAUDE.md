@@ -197,11 +197,14 @@ Two things learned the hard way next door, worth not relearning:
 ### Region identity
 
 If a bundle here joins on region, the `region_key` originates in
-`agromet-bundles/crop-weather/regions.csv` -- `ia, il, mn, ne, in, sd, oh, wi,
-ks, mo` -- and propagates unchanged. Never redefine the key, and fail loudly on
-one with no matching row. Note that node 4 may well be **national only**, in
-which case it has no region join at all; decide that in the brief rather than
-inheriting a per-region shape out of habit.
+`agromet-bundles/crop-weather/regions.csv` -- twelve keys as of 2026-09-24:
+`ia, il, mn, ne_irrigated, ne_rainfed, in, sd, oh, wi, ks_irrigated,
+ks_rainfed, mo` -- and propagates unchanged. Never redefine the key, and fail
+loudly on one with no matching row. Node 4 is **national for the trade
+scenario** and has no region join at all. Since brief 0002 it carries node 3's
+`regions` through unchanged, nested under `upstream_price_impact`, as evidence
+for the weather component, but it attributes nothing to them. Decide any
+per-region shape in a brief rather than inheriting one out of habit.
 
 ### Data sources
 
@@ -249,6 +252,9 @@ figure composed inside the transmission rather than by adding percentages. Built
 2026-09-20 from brief `docs/features/0001-corn-trade-policy.md`; plan with every
 decision and its reasoning: `docs/plans/0001-corn-trade-policy.md`. User-facing
 documentation: [`corn-trade-policy/README.md`](./corn-trade-policy/README.md).
+Extended 2026-09-24 by brief `docs/features/0002-upstream-passthrough.md` (plan
+`docs/plans/0002-upstream-passthrough.md`) to carry node 3's result through
+under `upstream_price_impact`.
 
 ```
 corn-trade-policy/
@@ -316,6 +322,15 @@ Three reasons, in descending order of force:
 - **No new data source was needed.** ERS Table 22 lives in the same keyless file
   node 3 already downloads, so FAS GATS, FAS Export Sales Reporting and Census
   USA Trade Online were all ruled out before anything was fetched.
+- **Node 3's result is carried through, nested and inert.** Brief 0002 added
+  `upstream_price_impact`: node 3's `regions`, `national` and `assumptions`,
+  deep-copied exactly as received, with a `source` note saying so. A flow serves
+  only its last step's output, so this is the only place a reader of the
+  four-model flow sees the per-region weather evidence. It feeds none of the
+  arithmetic, and the check asserts that by perturbing carried fields. It is
+  nested because a top-level `regions` would bring node 4's required keys within
+  one of node 3's. Only the three members are declared in the schema; their
+  fields belong to node 3's Modelfile, where brief 0003 has already added some.
 
 ### The four problems, as answered
 
@@ -335,6 +350,8 @@ Three reasons, in descending order of force:
    within the marketing year, so it would need an instrument, and three episodes
    in fifty years would fail the |t| >= 2.0 rule anyway.
 3. **A tariff is not a one-for-one sales loss. Decision: bushels, national.**
+   (The trade scenario stays national; since brief 0002 the output also carries
+   node 3's regions for reference, and attributes nothing to them.)
    Measured, and the reason this is not negotiable: US corn sales to China fell
    from 118 mil bu in marketing year 2023 to 1 mil bu in 2024 while **total US
    corn exports rose** from 2,255 to 2,873 mil bu; and across the 1980 Soviet
@@ -381,6 +398,19 @@ turn into a fitted number.
 - **Not yet verified:** the Model Home import, which needs a signed-in human at
   the Auth0 login.
 
+### Verified results, brief 0002 (2026-09-24)
+
+- `check_trade_policy.py`: **243/243 checks pass** (207 before this brief).
+- Every field published before this brief is **identical** on the committed
+  samples apart from `generated_at`; the sample figures above are unchanged.
+- The carried block is **identical** to node 3's members on the committed
+  ten-region sample and on a fresh twelve-region node 3 run (34 KB output).
+- Docker `--network none` output is identical to the local run apart from
+  `generated_at`. The Modelfile validates (`OK`). `check_schema_compatibility`
+  still binds node 3's `corn_price_impact`, still refuses `corn_price_regions`,
+  `corn_yield_snapshot` and `corn_yield_trajectory`, and refuses node 4's own
+  widened output (no top-level `regions`).
+
 ### Task list
 
 1. Add the model on the local Model Home stack from the branch subfolder URL and
@@ -394,6 +424,16 @@ turn into a fitted number.
    denominator to it.
 4. The soybean and acreage channel, as its own brief in this repo. The bundle
    README's soybean section is its specification.
+5. Refresh `sample_corn_price_impact.json` and `sample_payload.json` from a real
+   node 1 -> 2 -> 3 run on node 3's current twelve-region output, and update the
+   sample figures recorded above and in the bundle README. The committed sample
+   predates node 3's brief 0003 and has ten regions; deferred from brief 0002 so
+   that brief changed no published figure.
+6. After brief 0002 merges: rebuild node 4 on Model Home from `main`, run the
+   `corn-weather-yield-price-policy` flow, and confirm its output carries
+   `upstream_price_impact`. Flow steps reference a `model_id`, not a pinned
+   version, so no re-pointing is expected; confirm, and record the answer under
+   "Model Home platform facts".
 
 ## Task list
 
