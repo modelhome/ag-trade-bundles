@@ -75,6 +75,10 @@ Several of these are *optional* properties in node 3's output schema, so this
 model checks each one and **fails loudly naming the path** rather than
 defaulting.
 
+Node 3's `regions`, `national` and `assumptions` are also carried through whole,
+unchanged, into the output's `upstream_price_impact`. That copy feeds none of
+the figures above; see [Output](#output).
+
 **2. `scenario`** -- what you assume, supplied per run. In a flow it is an
 **`inline`** literal the flow author writes; the platform resolves each input
 independently, so a second input does not have to come from the step before.
@@ -224,6 +228,62 @@ Because both components use the **same** coefficient, their intervals are
 perfectly correlated. The combined interval comes from applying the bootstrap
 bounds to the combined shock, never from adding two intervals.
 
+## Output
+
+One JSON document, `corn_trade_policy_impact`, with six top-level keys:
+
+| Key | What it holds |
+|---|---|
+| `generated_at` | when the output was written (UTC) |
+| `metadata` | how the run was made: the upstream transmission, the export exposure, the destination table's vintage, the upstream run |
+| `scenario` | the scenario as stated, and its size against total use and against a complete year's exports |
+| `national` | this model's result: `weather` (from node 3), `trade` and `combined`, each with its range |
+| `assumptions` | every assumption behind the numbers, including the inherited `not_captured` list |
+| `upstream_price_impact` | node 3's own result, carried through for reference (below) |
+
+### `upstream_price_impact`: node 3's result, carried through
+
+A flow serves only its last step's output, so this block is where a reader of
+the four-model flow finds the evidence behind the weather component: the
+per-region yield anomalies that made the national weather shock, and the
+national figures that summarise them.
+
+```json
+"upstream_price_impact": {
+  "source": "This block is the upstream US Corn Price Impact model's (node 3's) result, carried through unchanged ...",
+  "regions": [ { "region_key": "ia", "yield_anomaly_real_pct": ..., "contribution_pct": ..., ... }, ... ],
+  "national": { "us_yield_shock_pct": ..., "price_impact_pct": ..., ... },
+  "assumptions": { "not_a_forecast": "...", "not_captured": [ ... ], ... }
+}
+```
+
+- **Unchanged.** `regions`, `national` and `assumptions` are node 3's members
+  exactly as received: no field renamed, recomputed, rounded, filtered or
+  reordered. Their fields are defined in node 3's output schema
+  (`ag-commodity-bundles/corn-price/Modelfile.toml`), not repeated here.
+- **Inert.** None of it enters this model's arithmetic. The check suite changes
+  a carried region's anomaly and several carried national figures and confirms
+  that `national.trade` and `national.combined` do not move.
+- **Weather only.** The per-region rows describe the weather component. The
+  trade scenario stays **national**: this model does no region join and
+  attributes nothing to any region. Export demand is a national quantity, and
+  there is no defensible way to assign a lost cargo to one state rather than
+  another.
+- **Duplicated on purpose.** Node 3's `national` repeats figures in
+  `national.weather`. That is the cost of carrying the source unchanged; the two
+  agree by construction, and `source` says which block belongs to which model.
+- **Nested on purpose.** There is no top-level `regions` key. Flow steps bind by
+  required-key set, and a top-level `regions` would bring this document within
+  one key of node 3's `corn_price_impact`.
+
+Node 3 currently returns **twelve regions**: Kansas and Nebraska each appear
+twice, as irrigated and rainfed. The committed sample predates that change and
+has ten (see [Future work](#future-work)). The block carries whatever node 3
+sends.
+
+A missing or mistyped `regions`, `national` or `assumptions` in the input stops
+the run with a message naming it, rather than publishing a partial block.
+
 ## The interval
 
 Every low and high figure is node 3's bootstrap interval on the transmission
@@ -338,6 +398,12 @@ travels in the output metadata so a reader can see how old the context is.
 - The soybean channel, as its own brief.
 - A within-season futures transmission, which would let a scenario be priced on
   the time base a policy announcement actually moves.
+- Refresh `sample_corn_price_impact.json`, and `sample_payload.json`, which
+  embeds it, from a real node 1 -> 2 -> 3 run on node 3's current
+  twelve-region output, and update the worked figures in this README and in the
+  repo's `CLAUDE.md`. The committed sample predates node 3's twelve-region
+  change and still has ten regions. It runs correctly, but it is not what the
+  live flow produces.
 
 ## Licence
 

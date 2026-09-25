@@ -35,6 +35,11 @@ What the model does, in order:
     combined figure composed inside the transmission's exponential -- NOT by
     adding the two percentages, which is not what the functional form says.
 
+5.  Carries node 3's `regions`, `national` and `assumptions` through unchanged
+    under `upstream_price_impact`, so a reader of the flow's last output sees
+    the per-region weather evidence. Nothing in that block is recomputed, and
+    none of it enters the arithmetic above.
+
 The denominator. Node 3's coefficient is fitted on the national yield's
 deviation from an ERS trend, whose commensurate bushel base is area harvested
 times trend yield: 16,344 mil bu for marketing year 2026. Node 3's output does
@@ -62,6 +67,7 @@ Deterministic and offline: a pure function of the two input documents and the
 committed destination table. No network calls, no randomness, no wall-clock
 dependence beyond the `generated_at` stamp.
 """
+import copy
 import csv
 import json
 import math
@@ -102,6 +108,16 @@ SCENARIO_IS_AN_INPUT = (
     "essentially nothing while total US corn exports rose to a record. A model "
     "that turned a tariff rate into lost bushels by itself would be claiming "
     "knowledge it does not have."
+)
+
+UPSTREAM_SOURCE = (
+    "This block is the upstream US Corn Price Impact model's (node 3's) result, "
+    "carried through unchanged for reference: its regions, national and "
+    "assumptions exactly as received. None of it is recomputed here, and none of "
+    "it is an input to any figure elsewhere in this document. The per-region "
+    "rows describe the weather component only; the trade scenario is national "
+    "and is attributed to no region. Node 3's national figures repeat those in "
+    "national.weather, and the two agree by construction."
 )
 
 
@@ -252,6 +268,30 @@ def destination_context(rows, meta):
         "role": meta["definitions"]["role"],
         "lag": meta["definitions"]["lag"],
     }
+
+
+def carried_upstream(upstream):
+    """Node 3's regions, national and assumptions, copied for publication.
+
+    Deep copies, so nothing later in this run can alter what is published, and
+    no rounding or formatting: the members are the parsed JSON as received. Node
+    3's schema requires all three, so a missing or mistyped one is a malformed
+    document and stops the run rather than publishing a partial block.
+    """
+    carried = {"source": UPSTREAM_SOURCE}
+    for key, kind, why in (
+        ("regions", list, "they are carried through as the per-region weather evidence"),
+        ("national", dict, "it is carried through beside this model's own result"),
+        ("assumptions", dict, "it is carried through, and its not_captured list is inherited"),
+    ):
+        value = require(upstream, key, why)
+        if not isinstance(value, kind):
+            raise RunError(
+                f"the upstream {key} is a {type(value).__name__}, not "
+                f"{'an array' if kind is list else 'an object'}: {why}"
+            )
+        carried[key] = copy.deepcopy(value)
+    return carried
 
 
 def process(upstream, bushels_not_sold_mil_bu, scenario_label, destinations, dest_meta):
@@ -475,9 +515,9 @@ def process(upstream, bushels_not_sold_mil_bu, scenario_label, destinations, des
         ),
     }
 
-    not_captured = list(
-        (upstream.get("assumptions") or {}).get("not_captured") or []
-    )
+    carried = carried_upstream(upstream)
+
+    not_captured = list(carried["assumptions"].get("not_captured") or [])
     not_captured = [
         f"inherited from the upstream transmission: {item}" for item in not_captured
     ]
@@ -593,6 +633,7 @@ def process(upstream, bushels_not_sold_mil_bu, scenario_label, destinations, des
         "scenario": scenario,
         "national": national,
         "assumptions": assumptions,
+        "upstream_price_impact": carried,
     }
 
 

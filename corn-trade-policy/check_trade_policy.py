@@ -21,8 +21,9 @@ the loud failures rather than a reproduced number.
 The things that could be wrong here and still produce a plausible-looking
 document are: the scenario divided by the wrong denominator, the sign inverted,
 the two components added instead of composed, a coefficient quietly hard-coded
-so an upstream refit stops propagating, an interval dropped, and an incoherent
-scenario priced instead of refused. Each of those has a check.
+so an upstream refit stops propagating, an interval dropped, an incoherent
+scenario priced instead of refused, and node 3's carried-through result altered
+on the way or quietly feeding the arithmetic. Each of those has a check.
 
 Exits non-zero on the first failure, after printing every result.
 """
@@ -722,6 +723,117 @@ def check_annotations(document):
               "signed" in text and "from 0 to 1" not in text)
 
 
+# ------------------------------------ the upstream passthrough (brief 0002)
+
+CARRIED = ("regions", "national", "assumptions")
+
+
+def check_passthrough(document):
+    print("\nbrief 0002  node 3's result is carried through, unchanged and inert")
+    upstream = load_upstream()
+    block = document.get("upstream_price_impact")
+    if not check("the output carries an upstream_price_impact object",
+                 isinstance(block, dict)):
+        return
+
+    # AC-1: exactly as received, compared as parsed JSON.
+    check("the block holds the source note and the three members, nothing else",
+          set(block) == {"source", *CARRIED}, f"{sorted(block)}")
+    for key in CARRIED:
+        check(f"the carried {key} equals the input's {key} exactly",
+              block.get(key) == upstream[key])
+
+    # AC-2: the block is the only addition, and it is nested. A top-level
+    # `regions` would bring this document within one key of node 3's.
+    check("the only new top-level key is upstream_price_impact",
+          set(document) == {"generated_at", "metadata", "scenario", "national",
+                            "assumptions", "upstream_price_impact"},
+          f"{sorted(document)}")
+    check("there is no top-level regions key", "regions" not in document)
+
+    # AC-7: it says what it is, in the document itself.
+    source = prose(block.get("source"))
+    for statement, needle in (
+        ("names the upstream model", "us corn price impact"),
+        ("says it is carried through unchanged", "carried through unchanged"),
+        ("says it is not recomputed", "none of it is recomputed"),
+        ("says it feeds no other figure", "none of it is an input to any figure"),
+        ("says the regions describe weather only", "weather component only"),
+        ("says the trade scenario is attributed to no region",
+         "attributed to no region"),
+    ):
+        check(f"the source note {statement}", needle in source, f"looked for {needle!r}")
+
+    # AC-3: the carried block feeds no arithmetic. Perturb carried fields that
+    # this model does not read, and the published figures must not move -- while
+    # the carried block must show the perturbation, proving it is copied from
+    # this run's input rather than from anywhere else.
+    code, base, _ = run_case(upstream, {"bushels_not_sold_mil_bu": 300})
+    perturbed = json.loads(json.dumps(upstream))
+    perturbed["regions"][0]["yield_anomaly_real_pct"] += 17.5
+    perturbed["national"]["us_production_shock_bu"] *= 3
+    perturbed["national"]["coverage_share_of_us_production"] = 0.123
+    perturbed["assumptions"]["weighting"] = "perturbed for the check"
+    code2, moved, _ = run_case(perturbed, {"bushels_not_sold_mil_bu": 300})
+    if check("the unperturbed and perturbed cases both run",
+             code == 0 and code2 == 0 and base and moved, f"exit {code}, {code2}"):
+        for key in ("trade", "combined", "weather"):
+            check(f"perturbing carried fields leaves national.{key} unchanged",
+                  base["national"][key] == moved["national"][key])
+        check("perturbing carried fields leaves the scenario unchanged",
+              base["scenario"] == moved["scenario"])
+        carried = moved["upstream_price_impact"]
+        check("the carried block shows the perturbed values",
+              carried["regions"][0] == perturbed["regions"][0]
+              and carried["national"] == perturbed["national"]
+              and carried["assumptions"] == perturbed["assumptions"])
+
+    # A missing or mistyped member is a malformed upstream document: the run
+    # stops and names it rather than publishing a partial block.
+    for key, wrong in (("regions", {}), ("national", []), ("assumptions", "none")):
+        missing = json.loads(json.dumps(upstream))
+        del missing[key]
+        code, _, stderr = run_case(missing, {})
+        check(f"an upstream document without {key} stops and names it",
+              code == 1 and key in stderr and "Traceback" not in stderr,
+              stderr.strip().splitlines()[-1][:110] if stderr.strip() else f"exit {code}")
+        mistyped = json.loads(json.dumps(upstream))
+        mistyped[key] = wrong
+        code, _, stderr = run_case(mistyped, {})
+        check(f"an upstream {key} of the wrong type stops and names it",
+              code == 1 and key in stderr and "Traceback" not in stderr,
+              stderr.strip().splitlines()[-1][:110] if stderr.strip() else f"exit {code}")
+
+    # AC-4: declared, typed and described, member by member.
+    model = tomllib.loads(MODELFILE.read_text())
+    output = next(o for o in model["outputs"] if o["name"] == "corn_trade_policy_impact")
+    schema = output["schema"]
+    check("upstream_price_impact is in the output's required set",
+          "upstream_price_impact" in schema["required"])
+    declared = schema["properties"].get("upstream_price_impact") or {}
+    check("the block is declared as an object with a description",
+          declared.get("type") == "object" and bool(declared.get("description")))
+    check("the block requires its source note and all three members",
+          set(declared.get("required") or []) == {"source", *CARRIED})
+    members = declared.get("properties") or {}
+    for key, kind in (("source", "string"), ("regions", "array"),
+                      ("national", "object"), ("assumptions", "object")):
+        member = members.get(key) or {}
+        check(f"upstream_price_impact.{key} is typed {kind} and described",
+              member.get("type") == kind and bool(member.get("description")))
+    items = (members.get("regions") or {}).get("items") or {}
+    check("each carried region row is typed object and described",
+          items.get("type") == "object" and bool(items.get("description")))
+
+    inputs = {i["name"]: i for i in model["inputs"]}
+    regions_text = prose(
+        inputs["corn_price_impact"]["schema"]["properties"]["regions"]["description"]
+    )
+    check("the input no longer says this model does not read the regions",
+          "does not read them" not in regions_text
+          and "carried through unchanged" in regions_text)
+
+
 # ----------------------------------------------------- documentation (AC-20)
 
 def check_readme():
@@ -742,6 +854,8 @@ def check_readme():
         ("the reallocation evidence", "reallocat"),
         ("the soybean channel", "soybean"),
         ("what the model is not", "not a forecast"),
+        ("the output document", "## output"),
+        ("the carried upstream block", "upstream_price_impact"),
     ):
         check(f"the README covers {topic}", needle in text, f"looked for {needle!r}")
 
@@ -770,6 +884,7 @@ def main(argv):
     check_loud_failures()
     check_three_places(document)
     check_annotations(document)
+    check_passthrough(document)
     check_readme()
 
     total = len(PASSES) + len(FAILURES)
