@@ -35,8 +35,13 @@ cpu = "0.5"
 # There is deliberately no `default` here, for the same reason the upstream
 # model gives: a schema default is a runnable "Example to paste", and a runnable
 # example for this model is a whole price-impact document, too large to paste.
-# This model is meant to run after the price model in a flow.
+# It ships as `example_file` instead: sample_corn_price_impact.json, which Model
+# Home offers under "Use example data?" as a link to the file -- beside the
+# scenario's `default`, so the whole run form fills in -- and checks fits this
+# schema whenever the model is saved. This model is meant to run after the
+# price model in a flow.
 name = "corn_price_impact"
+example_file = "sample_corn_price_impact.json"
 description = "The result document from the US Corn Price Impact model. In a flow this is wired straight from that model's output; nothing else needs filling in."
 
 [inputs.schema]
